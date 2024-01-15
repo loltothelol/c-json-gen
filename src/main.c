@@ -67,11 +67,13 @@ int main (int argc, char *argv [])
 	}
 	
 	/* print the results */
-	printf("ovautput:\n");
+	printf("\n === output ===\n");
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;
-		printf(" - %s (%d)\n", def->name, def->type);
+		printf(" - %s :: ", def->name);
+		print_schema_types(def->type);
+		putchar('\n');
 		head = head->next;
 	}
 
