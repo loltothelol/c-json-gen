@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "parse.h"
+#include "gen.h"
 
 static char *read_file (char const *path, size_t *size_ptr)
 {
@@ -68,14 +69,19 @@ int main (int argc, char *argv [])
 	
 	/* print the results */
 	printf("\n ===== OUTPUT =====\n");
+	SchemaGenCtx ctx = { "icratkaya", stdout };
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;
-		printf(" - %s :: ", def->name);
-		print_schema_types(def->type);
-		putchar('\n');
+	//	printf(" - %s :: ", def->name);
+	//	print_schema_types(def->type);
+		if (def->type == schema_obj_type) {
+			schema_gen_struct(def, &ctx, 0);
+			putchar('\n');
+		}
 		head = head->next;
 	}
+	
 
 	return EXIT_SUCCESS;
 }
