@@ -18,7 +18,7 @@ static char *read_file (char const *path, size_t *size_ptr)
 
 	char *buf = malloc (*size_ptr);
 	if (!buf) {
-		fprintf (stderr, "%s: dould not allocate buffer.\n", __func__);
+		fprintf (stderr, "%s: could not allocate buffer.\n", __func__);
 		fclose (file);
 		return NULL;
 	}
@@ -67,7 +67,7 @@ int main (int argc, char *argv [])
 	}
 	
 	/* print the results */
-	printf("\n === output ===\n");
+	printf("\n ===== OUTPUT =====\n");
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;

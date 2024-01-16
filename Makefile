@@ -3,7 +3,7 @@ SDIR:=src
 BDIR:=build
 ODIR:=$(BDIR)/obj
 CC:=gcc
-CFLAGS:=-g -Wshadow -pedantic-errors
+CFLAGS:=-g -std=c99 -Wshadow -pedantic-errors
 LIBS:=-ljson -lm
 DEP:=$(wildcard $(SDIR)/*.h)
 SRC:=$(wildcard $(SDIR)/*.c)

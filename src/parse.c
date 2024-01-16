@@ -1,9 +1,11 @@
 #include "parse.h"
 
-/* libc includes */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+
+/* merged into mainline ISO C standard as of 6/2019 */
+extern char *strndup(const char *str, size_t size);
 
 typedef struct str_slice StrSlice;
 typedef struct schema_ctx SchemaCtx;
@@ -27,8 +29,6 @@ struct schema_ctx {
 	unsigned base_len;
 };
 
-char *strndup(const char *str, size_t size);
-
 static
 json_value const *json_lookup_field(json_value const *v, char const *index)
 {
@@ -40,31 +40,18 @@ json_value const *json_lookup_field(json_value const *v, char const *index)
 }
 
 static
-SchemaType schema_parse_type(char const *str)
-{
-	if (!strcmp("string", str)) return schema_string;
-	if (!strcmp("number", str)) return schema_number;
-	if (!strcmp("integer", str)) return schema_integer;
-	if (!strcmp("boolean", str)) return schema_boolean;
-	if (!strcmp("array", str)) return schema_array;
-	if (!strcmp("object", str)) return schema_object;
-	if (!strcmp("null", str)) return schema_nullable;
-	return schema_none;
-}
-
-static
 SchemaType schema_parse_types(json_value const *arr)
 {
 	assert(arr->type == json_array);
-	SchemaType typs = schema_none;
+	SchemaType typs = schema_none_type;
 	for (unsigned i = 0; i < arr->u.array.length; ++i) {
 		json_value const *val = arr->u.array.values[i];
 		if (val->type != json_string) {
 			printf("%s: type was not formatted as a string.\n", __func__);
-			return schema_none;
+			return schema_none_type;
 		}
 		/* TODO: check validity */
-		typs |= schema_parse_type(val->u.string.ptr);
+		typs |= parse_schema_type(val->u.string.ptr);
 	}
 	return typs;
 }
@@ -153,7 +140,6 @@ int parse_API_schema_prop(json_object_entry *ent, SchemaProp *prop, SchemaCtx co
 		SchemaDef const *match_def = lookup_schema_def((SchemaDef *) ctx->defs->head, ref_end);
 		if (!match_def) {
 			printf("%s: did not find a match for $ref\n", __func__);
-			/* TODO: cleanup */
 			return -1;
 		}
 
@@ -165,12 +151,11 @@ int parse_API_schema_prop(json_object_entry *ent, SchemaProp *prop, SchemaCtx co
 		if (!type_json) {
 			printf("%s: no type field provided for '%.*s'\n",
 				   __func__, nam_len, nam);
-			/* TODO: cleanup */
 			return -1;
 		}
 
 		if (type_json->type == json_string) {
-			SchemaType const type = schema_parse_type(type_json->u.string.ptr);
+			SchemaType const type = parse_schema_type(type_json->u.string.ptr);
 			prop->value = create_dep_def(nam, nam_len, type, ctx);
 		}
 		else if (type_json->type == json_array) {
@@ -180,7 +165,6 @@ int parse_API_schema_prop(json_object_entry *ent, SchemaProp *prop, SchemaCtx co
 		else {
 			printf("%s: invalid type field provided for '%.*s'\n",
 				   __func__, nam_len, nam);
-			/* TODO: cleanup */
 			return -1;
 		}
 	}
@@ -239,7 +223,7 @@ int parse_API_schema_attrs(json_value *obj, struct schema_def *def, SchemaCtx co
 			char const *str = val->u.string.ptr;
 
 			printf(" TYPE : %s\n", str);
-			def->type = schema_parse_type(str);
+			def->type = parse_schema_type(str);
 		}
 		else if (!strncmp("properties", nam, nam_len)) {
 			printf(" PROPS\n");
@@ -257,9 +241,9 @@ int parse_API_schema_attrs(json_value *obj, struct schema_def *def, SchemaCtx co
 			}
 
 			/* ensure that `def` type is object */
-			if (def->type == schema_none) {
-				def->type = schema_object;
-			} else if (def->type != schema_object) {
+			if (def->type == schema_none_type) {
+				def->type = schema_obj_type;
+			} else if (def->type != schema_obj_type) {
 				printf("%s: non-object-typed value has properties.\n", __func__);
 				return -1;
 			}
@@ -278,7 +262,7 @@ struct schema_def *parse_API_schema(json_value *obj, SchemaCtx const *ctx)
 	char *const name = strndup(ctx->base, ctx->base_len);
 	if (!name) return NULL;
 
-	SchemaDef *const def = new_schema_def(name, schema_none);
+	SchemaDef *const def = new_schema_def(name, schema_none_type);
 	if (!def) {
 		fprintf(stderr, "%s: could not allocate schema def.\n", __func__);
 		free(name);
