@@ -67,9 +67,16 @@ int main (int argc, char *argv [])
 		json_value_free (root_obj);
 	}
 	
-	/* print the results */
-	printf("\n ===== OUTPUT =====\n");
-	SchemaGenCtx ctx = { "icratkaya", stdout };
+	/* output the results */
+	// printf("\n ===== OUTPUT =====\n");
+	FILE *outfile = fopen("gentypes.h", "w");
+	if (!outfile) {
+		printf("%s: could not open file for writing.\n", __func__);
+		return EXIT_FAILURE;
+	}
+	fputs("#pragma once\n\n", outfile);
+
+	SchemaGenCtx ctx = { "icratkaya", outfile };
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;
@@ -77,11 +84,14 @@ int main (int argc, char *argv [])
 	//	print_schema_types(def->type);
 		if (def->type == schema_obj_type) {
 			schema_gen_struct(def, &ctx, 0);
-			putchar('\n');
+			fputc('\n', ctx.stream);
+		} else if (!def->depends) {
+			schema_gen_typedef(def, &ctx, 0);
+			fputc('\n', ctx.stream);
 		}
 		head = head->next;
 	}
 	
-
+	fclose(outfile);
 	return EXIT_SUCCESS;
 }

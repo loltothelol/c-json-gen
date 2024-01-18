@@ -9,3 +9,4 @@ typedef struct schema_gen_ctx {
 } SchemaGenCtx;
 
 int schema_gen_struct(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
+int schema_gen_typedef(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
