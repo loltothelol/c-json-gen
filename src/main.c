@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* linux includes */
+#include <sys/stat.h>
+
 #include "parse.h"
-#include "gen.h"
+#include "parsegen.h"
 
 static char *read_file (char const *path, size_t *size_ptr)
 {
@@ -40,7 +43,7 @@ int main (int argc, char *argv [])
 	char const *API_path = "openapi.json";
 	if (argc > 2) {
 		if (!strcmp ("--help", argv [1])) {
-			printf ("Usage: c-json-gen <openapi.json>\n");
+			fprintf (stderr, "Usage: c-json-gen <openapi.json>\n");
 			return EXIT_FAILURE;
 		}
 		API_path = argv [1];
@@ -66,32 +69,44 @@ int main (int argc, char *argv [])
 		parse_API_root (root_obj, &objs);
 		json_value_free (root_obj);
 	}
-	
+
 	/* output the results */
 	// printf("\n ===== OUTPUT =====\n");
-	FILE *outfile = fopen("gentypes.h", "w");
+	FILE *outfile = fopen("out/genparse.h", "w");
 	if (!outfile) {
-		printf("%s: could not open file for writing.\n", __func__);
+		fprintf(stderr, "%s: could not open file for writing.\n", __func__);
 		return EXIT_FAILURE;
 	}
-	fputs("#pragma once\n\n", outfile);
 
-	SchemaGenCtx ctx = { "icratkaya", outfile };
+	static char const PROG_STUB[] =
+		"#pragma once\n"
+		"#include <assert.h>\n"
+		"#include <json.h>\n"
+		"#include \"gentypes.h\"\n"
+		"\n";
+	fputs(PROG_STUB, outfile);
+	fputs(JSON_LOOKUP_STUB, outfile);
+	fputc('\n', outfile);
+
+	SchemaGenCtx const ctx = { "icratkaya", outfile };
+
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;
-	//	printf(" - %s :: ", def->name);
-	//	print_schema_types(def->type);
-		if (def->type == schema_obj_type) {
-			schema_gen_struct(def, &ctx, 0);
-			fputc('\n', ctx.stream);
-		} else if (!def->depends) {
-			schema_gen_typedef(def, &ctx, 0);
+		if (!def->depends) {
+			schema_gen_parse(def, &ctx);
 			fputc('\n', ctx.stream);
 		}
+		// if (def->type == schema_obj_type) {
+		// 	schema_gen_struct(def, &ctx, 0);
+		// 	fputc('\n', ctx.stream);
+		// } else if (!def->depends) {
+		// 	schema_gen_typedef(def, &ctx, 0);
+		// 	fputc('\n', ctx.stream);
+		// }
 		head = head->next;
 	}
-	
+
 	fclose(outfile);
 	return EXIT_SUCCESS;
 }

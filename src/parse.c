@@ -53,7 +53,7 @@ static SchemaType schema_parse_types(json_value const *arr)
 	for (unsigned i = 0; i < arr->u.array.length; ++i) {
 		json_value const *val = arr->u.array.values[i];
 		if (val->type != json_string) {
-			printf("%s: type was not formatted as a string.\n", __func__);
+			fprintf(stderr, "%s: type was not formatted as a string.\n", __func__);
 			return schema_none_type;
 		}
 		/* TODO: check validity */
@@ -99,7 +99,7 @@ static SchemaDef const *parse_API_schema_ref(json_value *obj, char const *fld, u
 	json_value const *ref_url = json_lookup_field(obj, "$ref");
 	if (ref_url) {
 		if (ref_url->type != json_string) {
-			printf("%s: '%.*s' has non-string $ref.\n", __func__, fld_len, fld);
+			fprintf(stderr, "%s: '%.*s' has non-string $ref.\n", __func__, fld_len, fld);
 			return NULL;
 		}
 
@@ -109,7 +109,7 @@ static SchemaDef const *parse_API_schema_ref(json_value *obj, char const *fld, u
 		/* lookup the ref in the schema defs */
 		SchemaDef const *match_def = lookup_schema_def((SchemaDef *) ctx->defs->head, ref_end);
 		if (!match_def) {
-			printf("%s: did not find a match for $ref\n", __func__);
+			fprintf(stderr, "%s: did not find a match for $ref\n", __func__);
 			return NULL;
 		}
 
@@ -119,7 +119,7 @@ static SchemaDef const *parse_API_schema_ref(json_value *obj, char const *fld, u
 	else {
 		StrSlice *dep_name = create_dep_name(ctx->base, ctx->base_len, fld, fld_len);
 		if (!dep_name) {
-			printf("%s: could not create name string\n", __func__);
+			fprintf(stderr, "%s: could not create name string\n", __func__);
 			return NULL;
 		}
 
@@ -141,7 +141,7 @@ static int parse_API_schema_prop(json_object_entry *ent, SchemaProp *prop, Schem
 
 	json_value *obj = ent->value;
 	if (obj->type != json_object) {
-		printf ("%s: '%.*s' property is not formatted as a JSON object.\n", __func__, nam_len, nam);
+		fprintf (stderr, "%s: '%.*s' property is not formatted as a JSON object.\n", __func__, nam_len, nam);
 		return -1;
 	}
 
@@ -149,7 +149,7 @@ static int parse_API_schema_prop(json_object_entry *ent, SchemaProp *prop, Schem
 	if (!prop->def) return -1;
 
 	prop->name = strndup(nam, nam_len);
-	printf("   + '%s' :: %s\n", prop->name, prop->def->name);
+	// printf("   + '%s' :: %s\n", prop->name, prop->def->name);
 
 	json_value const *desc_json = json_lookup_field(obj, "description");
 	prop->desc = parse_opt_json_string(desc_json);
@@ -167,7 +167,7 @@ static SchemaProps *parse_API_schema_props(json_value *obj, SchemaCtx const *ctx
 	unsigned int const arr_siz = sizeof(SchemaProp[len]);
 	SchemaProps *props = malloc(sizeof(SchemaProps) + arr_siz);
 	if (!props) {
-		printf("%s: could not allocate SchemaProps object.\n", __func__);
+		fprintf(stderr, "%s: could not allocate SchemaProps object.\n", __func__);
 		return NULL;
 	}
 	props->length = len;
@@ -202,20 +202,20 @@ static SchemaDef *parse_API_schema_def(char const *name, json_value *obj, Schema
 		char const *const nam = ent->name;
 		unsigned int const nam_len = ent->name_length;
 
-		printf(" - \"%.*s\"", nam_len, nam);
+		// printf(" - \"%.*s\"", nam_len, nam);
 
 		if (!strncmp("type", nam, nam_len)) {
 			json_value *const val = ent->value;
 			if (val->type == json_string) {
 				SchemaType const type = parse_schema_type(val->u.string.ptr);
-				printf(" TYPE : %s\n", schema_type_name(type));
+				// printf(" TYPE : %s\n", schema_type_name(type));
 				def->type = type;
 			}
 			else if (val->type == json_array) {
 				SchemaType const types = schema_parse_types(val);
-				printf(" TYPES : ");
-				print_schema_types(types);
-				putchar('\n');
+				// printf(" TYPES : ");
+				// print_schema_types(types, stdout);
+				// putchar('\n');
 				def->type = types;
 			}
 		}
@@ -224,22 +224,22 @@ static SchemaDef *parse_API_schema_def(char const *name, json_value *obj, Schema
 			assert(val->type == json_string);
 			char const *str = val->u.string.ptr;
 			
-			printf(" DESC : %s\n", str);
+			// printf(" DESC : %s\n", str);
 			def->desc = strdup_trim(str);
 		}
 		else if (!strncmp("properties", nam, nam_len)) {
-			printf(" PROPS\n");
+			// printf(" PROPS\n");
 
 			json_value *const val = ent->value;
 			if (val->type != json_object) {
-				printf("%s: \"properties\" field is not formatted as a JSON object.\n", __func__);
+				fprintf(stderr, "%s: \"properties\" field is not formatted as a JSON object.\n", __func__);
 				free_schema_def(def);
 				goto err_free_def;
 			}
 
 			SchemaProps *props = parse_API_schema_props(val, ctx);
 			if (!props) {
-				printf("%s: could not parse schema properties.\n", __func__);
+				fprintf(stderr, "%s: could not parse schema properties.\n", __func__);
 				goto err_free_def;
 			}
 
@@ -247,25 +247,25 @@ static SchemaDef *parse_API_schema_def(char const *name, json_value *obj, Schema
 			if (def->type == schema_none_type) {
 				def->type = schema_obj_type;
 			} else if (def->type != schema_obj_type) {
-				printf("%s: non-object-typed value has properties.\n", __func__);
+				fprintf(stderr, "%s: non-object-typed value has properties.\n", __func__);
 				free_schema_def(def);
 				goto err_free_def;
 			}
 			def->u.props = props;
 		}
 		else if (!strncmp("items", nam, nam_len)) {
-			printf(" ITEMS\n");
+			// printf(" ITEMS\n");
 
 			json_value *const val = ent->value;
 			if (val->type != json_object) {
-				printf("%s: \"items\" field is not formatted as a JSON object.\n", __func__);
+				fprintf(stderr, "%s: \"items\" field is not formatted as a JSON object.\n", __func__);
 				free_schema_def(def);
 				goto err_free_def;
 			}
 
 			SchemaItems items = { parse_API_schema_ref(val, "[]", 2, ctx) };
 			if (!items.def) {
-				printf("%s: could not parse schema items.\n", __func__);
+				fprintf(stderr, "%s: could not parse schema items.\n", __func__);
 				free_schema_def(def);
 				goto err_free_def;
 			}
@@ -274,12 +274,12 @@ static SchemaDef *parse_API_schema_def(char const *name, json_value *obj, Schema
 			if (def->type == schema_none_type) {
 				def->type = schema_arr_type;
 			} else if (def->type != schema_arr_type) {
-				printf("%s: non-array-typed value has items.\n", __func__);
+				fprintf(stderr, "%s: non-array-typed value has items.\n", __func__);
 				goto err_free_def;
 			}
 			def->u.items = items;
 		}
-		else putchar('\n');
+		// else putchar('\n');
 	}
 
 	slist_append(ctx->defs, &def->head);
@@ -299,7 +299,7 @@ static int parse_API_schemas (json_value const *schemas_obj, SListInfo *out)
 
 	for (unsigned int i = 0; i < len; ++i) {
 		json_object_entry *ent = &vals[i];
-		printf("schema [%d]: \"%.*s\"\n", i, ent->name_length, ent->name);
+		// printf("schema [%d]: \"%.*s\"\n", i, ent->name_length, ent->name);
 
 		SchemaCtx const ctx = {
 			.defs = out,
@@ -309,13 +309,13 @@ static int parse_API_schemas (json_value const *schemas_obj, SListInfo *out)
 
 		char *const name = strndup(ctx.base, ctx.base_len);
 		if (!name) {
-			/* TODO: cleanup */
+			fprintf(stderr, "%s: could not duplicate name string.\n", __func__);
 			return -1;
 		}
 
 		if (!parse_API_schema_def(name, ent->value, &ctx)) {
 			fprintf(stderr, "%s: could not parse schema def.\n", __func__);
-			/* TODO: cleanup */
+			free(name);
 			return -1;
 		}
 	}
@@ -327,13 +327,13 @@ int parse_API_root (json_value const *root_obj, SListInfo *out)
 {
 	json_value const *components_obj = json_lookup_field (root_obj, "components");
 	if (!components_obj) {
-		printf ("%s: could not locate 'components' JSON field.\n", __func__);
+		fprintf (stderr, "%s: could not locate 'components' JSON field.\n", __func__);
 		return -1;
 	}
 
 	json_value const *schemas_obj = json_lookup_field (components_obj, "schemas");
 	if (!schemas_obj) {
-		printf ("%s: could not locate 'schemas' JSON field.\n", __func__);
+		fprintf (stderr, "%s: could not locate 'schemas' JSON field.\n", __func__);
 		return -1;
 	}
 

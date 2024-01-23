@@ -1,8 +1,11 @@
-#include "gen.h"
+#include "typegen.h"
 
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
+
+static void schema_gen_shead(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
+static void schema_gen_sbody(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
 
 static inline
 void findent(int indent, FILE *stream)
@@ -12,10 +15,12 @@ void findent(int indent, FILE *stream)
 }
 
 static inline
-void fblock(char const *msg, FILE *stream)
+void fblock(char const *msg, FILE *stream, int indent)
 {
-	int msg_len = strlen(msg);
+	findent(indent, stream);
 	fputs("/*\n", stream);
+
+	int msg_len = strlen(msg);
 	while (msg_len) {
 		int line = (msg_len > 60) ? 60 : msg_len;
 		/* search for a break (whitespace) */
@@ -33,14 +38,18 @@ void fblock(char const *msg, FILE *stream)
 	fputs(" */\n", stream);
 }
 
-static void print_def_as_ctype(SchemaDef const *def, SchemaGenCtx const *ctx, int indent)
+void print_def_as_ctype(SchemaDef const *def, SchemaGenCtx const *ctx, int indent)
 {
 	static const char *LEN_TYPE = "unsigned";
 	FILE *const s = ctx->stream;
 	switch (def->type) {
 		case schema_obj_type:
-			if (def->depends) schema_gen_struct(def, ctx, indent);
-			else fprintf(s, "struct %s_%s", ctx->prefix, def->name);
+			if (def->depends) {
+				schema_gen_shead(def, ctx, indent);
+				schema_gen_sbody(def, ctx, indent + 1);
+			} else {
+				fprintf(s, "struct %s_%s", ctx->prefix, def->name);
+			}
 			break;
 		case schema_arr_type:
 			fprintf(s, "struct { %s len; ", LEN_TYPE);
@@ -86,39 +95,53 @@ static void print_def_as_sfield(char const *fld, SchemaDef const *def, SchemaGen
 	}
 }
 
+static
+void schema_gen_shead(SchemaDef const *def, SchemaGenCtx const *ctx, int indent)
+{
+	FILE *const s = ctx->stream;
+
+	/* print the desc. as a block comment */
+	if (def->desc) fblock(def->desc, s, indent);
+
+	findent(indent, s);
+	if (def->depends)
+		fputs("struct ", s);
+	else
+		fprintf(s, "struct %s_%s ", ctx->prefix, def->name);
+}
+
+static
+void schema_gen_sbody(SchemaDef const *def, SchemaGenCtx const *ctx, int indent)
+{
+	FILE *const s = ctx->stream;
+	fputs("{\n", s);
+	for (unsigned int i = 0; i < def->u.props->length; ++i) {
+		/* prepend a blank line for all fields except first */
+		if (i) fputc('\n', s);
+
+		/* add a description comment directly above the field */
+		SchemaProp const prop = def->u.props->entries[i];
+		if (prop.desc) {
+			findent(indent, s);
+			fprintf(s, "/* %s */\n", prop.desc);
+		}
+
+		findent(indent, s);
+		print_def_as_sfield(prop.name, prop.def, ctx, indent);
+		fputs(";\n", s);
+	}
+	fputc('}', s);
+}
+
 int schema_gen_struct(SchemaDef const *def, SchemaGenCtx const *ctx, int indent)
 {
 	assert(def->type == schema_obj_type);
 	assert(def->u.props);
 	
 	FILE *const s = ctx->stream;
-	
-	findent(indent, s);
-	if (def->depends)
-		fprintf(s, "struct {\n");
-	else {
-		/* print the desc. as a block comment */
-		if (def->desc) fblock(def->desc, s);
-		fprintf(s, "struct %s_%s {\n", ctx->prefix, def->name);
-	}
-	
-	++indent;
-	for (unsigned int i = 0; i < def->u.props->length; ++i) {
-		if (i) fputc('\n', s);
-		SchemaProp const prop = def->u.props->entries[i];
-		if (prop.desc) {
-			findent(indent, s);
-			fprintf(s, "/* %s */\n", prop.desc);
-		}
-		findent(indent, s);
-		print_def_as_sfield(prop.name, prop.def, ctx, indent);
-		fputs(";\n", s);
-	}
-	--indent;
-	
-	findent(indent, s);
-	if (def->depends) fputc('}', s);
-	else fputs("};\n", s);
+	schema_gen_shead(def, ctx, indent);
+	schema_gen_sbody(def, ctx, indent + 1);
+	if (!def->depends) fputs(";\n", s);
 	
 	return 0;
 }

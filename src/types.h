@@ -36,7 +36,7 @@ static inline char const *schema_type_name(SchemaType T)
 }
 #undef SCHEMA_TYPE
 
-void print_schema_types(SchemaType T);
+void print_schema_types(SchemaType T, FILE *P);
 SchemaType parse_schema_type(char const *S);
 
 typedef struct schema_prop SchemaProp;

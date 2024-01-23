@@ -2,10 +2,10 @@
 
 #include <stdlib.h>
 
-#define SCHEMA_TYPE(X,Y,Z) if(T&Z){T&=~Z;printf(T?#X", ":#X);}
-void print_schema_types(SchemaType T)
+#define SCHEMA_TYPE(X,Y,Z) if(T&Z){T&=~Z;fputs(T?#X", ":#X,P);}
+void print_schema_types(SchemaType T, FILE *P)
 {
-	if (!T) printf("<none>"); else { X_SCHEMA_TYPES }
+	if (!T) fputs("<none>", P); else { X_SCHEMA_TYPES }
 }
 #undef SCHEMA_TYPE
 

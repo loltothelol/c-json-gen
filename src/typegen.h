@@ -8,5 +8,8 @@ typedef struct schema_gen_ctx {
 	FILE *stream;
 } SchemaGenCtx;
 
+/* utility procedures */
+void print_def_as_ctype(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
+
 int schema_gen_struct(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
 int schema_gen_typedef(SchemaDef const *def, SchemaGenCtx const *ctx, int indent);
