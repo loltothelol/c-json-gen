@@ -9,6 +9,7 @@
 
 #include "parse.h"
 #include "parsegen.h"
+#include "str-slice.h"
 
 static char *read_file (char const *path, size_t *size_ptr)
 {
@@ -41,17 +42,19 @@ static char *read_file (char const *path, size_t *size_ptr)
 int main (int argc, char *argv [])
 {
 	char const *API_path = "openapi.json";
-	if (argc > 2) {
-		if (!strcmp ("--help", argv [1])) {
-			fprintf (stderr, "Usage: c-json-gen <openapi.json>\n");
+	char const *out_path = "out";
+	if (argc > 3) {
+		if (!strcmp("--help", argv[1])) {
+			fprintf(stderr, "Usage: c-json-gen <input: openapi.json> <output: directory>\n");
 			return EXIT_FAILURE;
 		}
-		API_path = argv [1];
+		API_path = argv[1];
+		out_path = argv[2];
 	}
 
 	/* read the API file and parse it as JSON */
 	size_t API_size;
-	char *API_buf = read_file (API_path, &API_size);
+	char *API_buf = read_file(API_path, &API_size);
 	if (!API_buf) {
 		fprintf (stderr, "%s: failed to read API file \"%s\"\n", __func__, API_path);
 		return EXIT_FAILURE;
@@ -63,28 +66,33 @@ int main (int argc, char *argv [])
 
 	/* traverse the parsed JSON structure */
 	{
-		json_value *root_obj = json_parse (API_buf, API_size);
+		json_value *root_obj = json_parse(API_buf, API_size);
 		if (!root_obj)
 			return -1;
-		parse_API_root (root_obj, &objs);
-		json_value_free (root_obj);
+		parse_API_root(root_obj, &objs);
+		json_value_free(root_obj);
 	}
 
 	/* output the results */
-	// printf("\n ===== OUTPUT =====\n");
-	FILE *outfile = fopen("out/genparse.h", "w");
-	if (!outfile) {
-		fprintf(stderr, "%s: could not open file for writing.\n", __func__);
-		return EXIT_FAILURE;
+	FILE *outfile;
+	{
+		StrSlice *outfile_path = printf_str_slice("%s/api-parse.h", out_path);
+		assert(outfile_path);
+		outfile = fopen(outfile_path->buf, "w");
+		if (!outfile) {
+			fprintf(stderr, "%s: could not open file \"%s\" for writing.\n", __func__, outfile_path->buf);
+			return EXIT_FAILURE;
+		}
+		free(outfile_path);
 	}
 
-	static char const PROG_STUB[] =
+	static char const PROG_INCS[] =
 		"#pragma once\n"
 		"#include <assert.h>\n"
+		"#include <string.h>\n"
 		"#include <json.h>\n"
-		"#include \"gentypes.h\"\n"
-		"\n";
-	fputs(PROG_STUB, outfile);
+		"#include \"gentypes.h\"\n";
+	fprintf(outfile, "%s\n", PROG_INCS);
 	fputs(JSON_LOOKUP_STUB, outfile);
 	fputc('\n', outfile);
 
@@ -93,8 +101,12 @@ int main (int argc, char *argv [])
 	SListHead *head = objs.head;
 	while (head) {
 		SchemaDef *def = (SchemaDef *) head;
+		printf ("- %s (%s)\n", def->name, schema_type_name(def->type));
 		if (!def->depends) {
-			schema_gen_parse(def, &ctx);
+			if (schema_gen_parse(def, &ctx) < 0) {
+				fprintf(stderr, "error while generating parser.\n");
+				break;
+			}
 			fputc('\n', ctx.stream);
 		}
 		// if (def->type == schema_obj_type) {

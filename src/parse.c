@@ -3,7 +3,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <string.h>
+
+#include "str-slice.h"
 
 /* merged into mainline ISO C standard as of 6/2019 */
 extern char *strdup(const char *str);
@@ -15,18 +16,6 @@ static char *strdup_trim(const char *str) {
 	while (isspace(str[len-1]) && len)
 		--len;
 	return strndup(str, len);
-}
-
-typedef struct str_slice {
-	unsigned int len;
-	char buf[];
-} StrSlice;
-
-static inline StrSlice *new_str_slice(unsigned int len) {
-	size_t const siz = sizeof(StrSlice) + sizeof(char[len + 1U]);
-	StrSlice *const str = malloc(siz);
-	if (!str) return NULL;
-	return memset(str, 0, siz);
 }
 
 typedef struct schema_ctx {
